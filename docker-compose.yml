@@ -1,0 +1,107 @@
+version: "0.0.0"
+
+name: supervisor
+services:
+  supervisor-backend:
+    volumes:
+      # dev <-
+      - type: bind
+        source: ../supervisor
+        target: /app
+      - type: volume
+        source: supervisor-node-modules
+        target: /app/node_modules
+        # dev ->
+      - type: volume
+        source: ffmpeg-output
+        target: /app/ffmpeg-output
+      - type: volume
+        source: ffmpeg-input
+        target: /app/ffmpeg-input
+      - type: volume
+        source: vosk-input
+        target: /app/vosk-input
+      # dev <-
+    build:
+      ../supervisor
+      # dev ->
+    # build:
+    #   https://github.com/MasterKufa/Supervisor_Backend.git
+    command: ./node_modules/.bin/nest start --watch
+    ports:
+      - 3021:3000
+    depends_on:
+      - postgres
+      - vosk
+      - ffmpeg
+    networks:
+      - supervisor
+
+  supervisor-frontend:
+    volumes:
+      - type: bind
+        source: ../supervisor_frontend
+        target: /app
+      - type: volume
+        source: supervisor-front-node-modules
+        target: /app/node_modules
+    build:
+      ../supervisor_frontend
+    ports:
+      - 3025:3000
+    networks:
+      - supervisor
+
+  supervisor-postgres:
+    image: postgres:14.8-alpine
+    environment:
+      POSTGRES_DB: ${SUPERVISOR_POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - supervisor-postgres:/var/lib/postgresql/data/pgdata
+    ports:
+      - "3022:5432"
+    networks:
+      - supervisor
+
+  vosk_server:
+    # todo use github repo url in future
+    build: ../vosk_server
+    ports:
+      - 3023:3000
+    volumes:
+      - type: volume
+        source: vosk-input
+        target: /app/input
+    networks:
+      - supervisor
+
+  # ffmpeg_server:
+  #   # todo use github repo url in future
+  #   build: ../ffmpeg_server
+  #   volumes:
+  #     - type: volume
+  #       source: ffmpeg-output
+  #       target: /app/output
+  #     - type: volume
+  #       source: ffmpeg-input
+  #       target: /app/input
+  #   ports:
+  #     - 3024:3000
+  #   networks:
+  #     - supervisor
+
+volumes:
+  supervisor-postgres:
+  supervisor-node-modules:
+  supervisor-front-node-modules:
+  ffmpeg-output:
+  ffmpeg-input:
+  vosk-input:
+
+networks:
+  supervisor:
+    name: supervisor
+    driver: bridge
